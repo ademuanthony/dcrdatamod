@@ -1,4 +1,4 @@
-module github.com/decred/dcrdatamod/web
+module github.com/decred/dcrdata/web
 
 go 1.13
 

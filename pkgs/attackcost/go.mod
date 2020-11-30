@@ -22,7 +22,7 @@ require (
 	github.com/decred/dcrdata/semver v1.0.0
 	github.com/decred/dcrdata/stakedb/v3 v3.1.1
 	github.com/decred/dcrdata/v5 v5.2.2
-	github.com/decred/dcrdatamod/web v0.0.0-00010101000000-000000000000
+	github.com/decred/dcrdata/web v0.0.0-00010101000000-000000000000
 	github.com/decred/slog v1.1.0
 	github.com/go-chi/chi v4.1.2+incompatible
 	github.com/google/gops v0.3.13
@@ -31,4 +31,4 @@ require (
 	github.com/prometheus/common v0.15.0
 )
 
-replace github.com/decred/dcrdatamod/web => ../../web
+replace github.com/decred/dcrdata/web => ../../web
