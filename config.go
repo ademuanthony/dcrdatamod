@@ -90,8 +90,8 @@ type config struct {
 	ReloadHTML   bool   `long:"reload-html" description:"Reload HTML templates on every request" env:"DCRDATA_RELOAD_HTML"`
 
 	DisableBlockExplorer          bool `long:"disable-block-explorer" description:"Disables the block explorer and blockchain sync component from running."`
-	EnableAttackCost              bool `long:"attack-cost" description:"Enable/Disables the attack cost calculator component from running."`
-	EnableStakingRewardCalculator bool `long:"staking-reward" description:"Enable/Disables the staking reward calculator component from running."`
+	EnableAttackCost              int  `long:"attack-cost" description:"Enable/Disables the attack cost calculator component from running."`
+	EnableStakingRewardCalculator int  `long:"staking-reward" description:"Enable/Disables the staking reward calculator component from running."`
 
 	// API/server
 	APIProto            string  `long:"apiproto" description:"Protocol for API (http or https)" env:"DCRDATA_ENABLE_HTTPS"`
@@ -181,8 +181,8 @@ var (
 		TestnetLink:         defaultTestnetLink,
 		OnionAddress:        defaultOnionAddress,
 
-		EnableAttackCost:              true,
-		EnableStakingRewardCalculator: true,
+		EnableAttackCost:              1,
+		EnableStakingRewardCalculator: 1,
 	}
 )
 
