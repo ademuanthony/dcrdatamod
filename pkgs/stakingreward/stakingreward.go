@@ -1,4 +1,4 @@
-package attackcost
+package stakingreward
 
 import (
 	"io"
@@ -6,27 +6,25 @@ import (
 	"sync"
 
 	"github.com/decred/dcrd/chaincfg/v2"
-	"github.com/decred/dcrd/rpcclient/v5"
+	"github.com/decred/dcrd/dcrutil"
+	"github.com/decred/dcrd/rpcclient"
 	"github.com/decred/dcrd/wire"
 	"github.com/decred/dcrdata/db/dbtypes/v2"
-	"github.com/decred/dcrdata/exchanges/v2"
+	"github.com/decred/dcrdata/exchanges"
 	"github.com/decred/dcrdata/explorer/types/v2"
-	"github.com/decred/dcrdata/txhelpers"
+	"github.com/decred/dcrdata/txhelpers/v4"
 	"github.com/decred/dcrdata/web"
+	"github.com/prometheus/common/log"
 )
 
-type attackcost struct {
+type calculator struct {
 	templates *web.Templates
 	xcBot     *exchanges.ExchangeBot
 
 	pageData *web.PageData
 
-	height          int64
-	hashrate        float64
-	ticketPrice     float64
-	ticketPoolSize  int64
-	ticketPoolValue float64
-	coinSupply      int64
+	TicketReward float64
+	RewardPeriod float64
 
 	ChainParams      *chaincfg.Params
 	Version          string
@@ -38,13 +36,15 @@ type attackcost struct {
 }
 
 func New(dcrdClient *rpcclient.Client, webServer *web.Server,
-	xcBot *exchanges.ExchangeBot, params *chaincfg.Params) (*attackcost, error) {
-	exp := &attackcost{
+	xcBot *exchanges.ExchangeBot, params *chaincfg.Params) (*calculator, error) {
+	exp := &calculator{
 		templates:    webServer.Templates,
 		xcBot:        xcBot,
 		ChainParams:  params,
 		dcrdChainSvr: dcrdClient,
 	}
+
+	exp.MeanVotingBlocks = txhelpers.CalcMeanVotingBlocks(params)
 
 	hash, err := dcrdClient.GetBestBlockHash()
 	if err != nil {
@@ -92,50 +92,39 @@ func New(dcrdClient *rpcclient.Client, webServer *web.Server,
 		},
 	}
 
-	webServer.AddRoute("/attack-cost", web.GET, exp.AttackCost)
+	webServer.AddRoute("/staking-reward", web.GET, exp.StakingReward)
 
 	return exp, nil
 }
 
-func (exp *attackcost) ConnectBlock(w *wire.BlockHeader) error {
+func (exp *calculator) ConnectBlock(w *wire.BlockHeader) error {
 	exp.reorgLock.Lock()
 	defer exp.reorgLock.Unlock()
-	exp.height = int64(w.Height)
-	hash := w.BlockHash()
-
-	// Hashrate
-	header, err := exp.dcrdChainSvr.GetBlockHeaderVerbose(&hash)
-	if err != nil {
-		return err
-	}
-	targetTimePerBlock := float64(exp.ChainParams.TargetTimePerBlock)
-	exp.hashrate = dbtypes.CalculateHashRate(header.Difficulty, targetTimePerBlock)
-
-	// Coin supply
-	coinSupply, err := exp.dcrdChainSvr.GetCoinSupply()
-	if err != nil {
-		return err
-	}
-	exp.coinSupply = int64(coinSupply)
 
 	// Stake difficulty (ticket price)
 	stakeDiff, err := exp.dcrdChainSvr.GetStakeDifficulty()
 	if err != nil {
 		return err
 	}
-	exp.ticketPrice = stakeDiff.CurrentStakeDifficulty
 
-	// Ticket pool info
-	poolValue, err := exp.dcrdChainSvr.GetTicketPoolValue()
+	nbSubsidy, err := exp.dcrdChainSvr.GetBlockSubsidy(int64(w.Height)+1, 5)
 	if err != nil {
-		return err
+		log.Errorf("GetBlockSubsidy for %d failed: %v", w.Height, err)
 	}
-	exp.ticketPoolValue = poolValue.ToCoin()
-	hashes, err := exp.dcrdChainSvr.LiveTickets()
-	if err != nil {
-		return err
-	}
-	exp.ticketPoolSize = int64(len(hashes))
+
+	posSubsPerVote := dcrutil.Amount(nbSubsidy.PoS).ToCoin() /
+		float64(exp.ChainParams.TicketsPerBlock)
+	exp.TicketReward = 100 * posSubsPerVote / stakeDiff.CurrentStakeDifficulty
+
+	// The actual reward of a ticket needs to also take into consideration the
+	// ticket maturity (time from ticket purchase until its eligible to vote)
+	// and coinbase maturity (time after vote until funds distributed to ticket
+	// holder are available to use).
+	avgSSTxToSSGenMaturity := exp.MeanVotingBlocks +
+		int64(exp.ChainParams.TicketMaturity) +
+		int64(exp.ChainParams.CoinbaseMaturity)
+	exp.RewardPeriod = float64(avgSSTxToSSGenMaturity) *
+		exp.ChainParams.TargetTimePerBlock.Hours() / 24
 
 	return nil
 }
@@ -143,7 +132,7 @@ func (exp *attackcost) ConnectBlock(w *wire.BlockHeader) error {
 // commonData grabs the common page data that is available to every page.
 // This is particularly useful for extras.tmpl, parts of which
 // are used on every page
-func (exp *attackcost) commonData(r *http.Request) *web.CommonPageData {
+func (exp *calculator) commonData(r *http.Request) *web.CommonPageData {
 
 	darkMode, err := r.Cookie(web.DarkModeCoookie)
 	if err != nil && err != http.ErrNoCookie {
@@ -164,7 +153,7 @@ func (exp *attackcost) commonData(r *http.Request) *web.CommonPageData {
 }
 
 // AttackCost is the page handler for the "/attack-cost" path.
-func (ac *attackcost) AttackCost(w http.ResponseWriter, r *http.Request) {
+func (ac *calculator) StakingReward(w http.ResponseWriter, r *http.Request) {
 	price := 24.42
 	if ac.xcBot != nil {
 		if rate := ac.xcBot.Conversion(1.0); rate != nil {
@@ -174,24 +163,16 @@ func (ac *attackcost) AttackCost(w http.ResponseWriter, r *http.Request) {
 
 	ac.reorgLock.Lock()
 
-	str, err := ac.templates.ExecTemplateToString("attackcost", struct {
+	str, err := ac.templates.ExecTemplateToString("stakigreward", struct {
 		*web.CommonPageData
-		HashRate        float64
-		Height          int64
-		DCRPrice        float64
-		TicketPrice     float64
-		TicketPoolSize  int64
-		TicketPoolValue float64
-		CoinSupply      int64
+		RewardPeriod float64
+		TicketReward float64
+		DCRPrice     float64
 	}{
-		CommonPageData:  ac.commonData(r),
-		HashRate:        ac.hashrate,
-		Height:          ac.height,
-		DCRPrice:        price,
-		TicketPrice:     ac.ticketPrice,
-		TicketPoolSize:  ac.ticketPoolSize,
-		TicketPoolValue: ac.ticketPoolValue,
-		CoinSupply:      ac.coinSupply,
+		CommonPageData: ac.commonData(r),
+		RewardPeriod:   ac.RewardPeriod,
+		TicketReward:   ac.TicketReward,
+		DCRPrice:       price,
 	})
 	ac.reorgLock.Unlock()
 
@@ -211,7 +192,7 @@ func (ac *attackcost) AttackCost(w http.ResponseWriter, r *http.Request) {
 // StatusPage provides a page for displaying status messages and exception
 // handling without redirecting. Be sure to return after calling StatusPage if
 // this completes the processing of the calling http handler.
-func (exp *attackcost) StatusPage(w http.ResponseWriter, r *http.Request, code, message, additionalInfo string, sType web.ExpStatus) {
+func (exp *calculator) StatusPage(w http.ResponseWriter, r *http.Request, code, message, additionalInfo string, sType web.ExpStatus) {
 	commonPageData := exp.commonData(r)
 	if commonPageData == nil {
 		// exp.blockData.GetTip likely failed due to empty DB.
