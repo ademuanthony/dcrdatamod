@@ -11,7 +11,6 @@ import (
 	"github.com/decred/dcrdata/db/dbtypes/v2"
 	"github.com/decred/dcrdata/exchanges/v2"
 	"github.com/decred/dcrdata/explorer/types/v2"
-	"github.com/decred/dcrdata/txhelpers"
 	"github.com/decred/dcrdata/web"
 )
 

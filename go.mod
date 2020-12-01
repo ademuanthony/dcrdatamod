@@ -8,11 +8,9 @@ require (
 	github.com/decred/dcrd/dcrutil/v2 v2.0.1
 	github.com/decred/dcrd/rpcclient/v5 v5.0.1
 	github.com/decred/dcrd/wire v1.4.0
-	github.com/decred/dcrdata/db/dbtypes v1.1.0 // indirect
-	github.com/decred/dcrdata/exchanges v1.0.0 // indirect
 	github.com/decred/dcrdata/exchanges/v2 v2.1.0
-	github.com/decred/dcrdata/explorer/types v1.1.0 // indirect
 	github.com/decred/dcrdata/pkgs/attackcost v0.0.0-00010101000000-000000000000
+	github.com/decred/dcrdata/pkgs/stakingreward v0.0.0-00010101000000-000000000000
 	github.com/decred/dcrdata/rpcutils/v3 v3.0.1
 	github.com/decred/dcrdata/semver v1.0.0
 	github.com/decred/dcrdata/v5 v5.2.2
@@ -24,6 +22,8 @@ require (
 	github.com/jrick/logrotate v1.0.0
 )
 
-replace github.com/decred/dcrdata/web => ./web
-
-replace github.com/decred/dcrdata/pkgs/attackcost => ./pkgs/attackcost
+replace (
+	github.com/decred/dcrdata/pkgs/attackcost => ./pkgs/attackcost
+	github.com/decred/dcrdata/pkgs/stakingreward => ./pkgs/stakingreward
+	github.com/decred/dcrdata/web => ./web
+)

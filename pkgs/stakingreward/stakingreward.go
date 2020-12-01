@@ -7,14 +7,13 @@ import (
 
 	"github.com/decred/dcrd/chaincfg/v2"
 	"github.com/decred/dcrd/dcrutil"
-	"github.com/decred/dcrd/rpcclient"
+	"github.com/decred/dcrd/rpcclient/v5"
 	"github.com/decred/dcrd/wire"
 	"github.com/decred/dcrdata/db/dbtypes/v2"
-	"github.com/decred/dcrdata/exchanges"
+	"github.com/decred/dcrdata/exchanges/v2"
 	"github.com/decred/dcrdata/explorer/types/v2"
 	"github.com/decred/dcrdata/txhelpers/v4"
 	"github.com/decred/dcrdata/web"
-	"github.com/prometheus/common/log"
 )
 
 type calculator struct {
@@ -23,6 +22,8 @@ type calculator struct {
 
 	pageData *web.PageData
 
+	Height       uint32
+	TicketPrice  float64
 	TicketReward float64
 	RewardPeriod float64
 
@@ -59,7 +60,7 @@ func New(dcrdClient *rpcclient.Client, webServer *web.Server,
 		return nil, err
 	}
 
-	tmpls := []string{"attackcost"}
+	tmpls := []string{"stakingreward", "status"}
 
 	for _, name := range tmpls {
 		if err := exp.templates.AddTemplate(name); err != nil {
@@ -101,11 +102,14 @@ func (exp *calculator) ConnectBlock(w *wire.BlockHeader) error {
 	exp.reorgLock.Lock()
 	defer exp.reorgLock.Unlock()
 
+	exp.Height = w.Height
+
 	// Stake difficulty (ticket price)
 	stakeDiff, err := exp.dcrdChainSvr.GetStakeDifficulty()
 	if err != nil {
 		return err
 	}
+	exp.TicketPrice = stakeDiff.CurrentStakeDifficulty
 
 	nbSubsidy, err := exp.dcrdChainSvr.GetBlockSubsidy(int64(w.Height)+1, 5)
 	if err != nil {
@@ -163,13 +167,17 @@ func (ac *calculator) StakingReward(w http.ResponseWriter, r *http.Request) {
 
 	ac.reorgLock.Lock()
 
-	str, err := ac.templates.ExecTemplateToString("stakigreward", struct {
+	str, err := ac.templates.ExecTemplateToString("stakingreward", struct {
 		*web.CommonPageData
+		Height       uint32
+		TicketPrice  float64
 		RewardPeriod float64
 		TicketReward float64
 		DCRPrice     float64
 	}{
 		CommonPageData: ac.commonData(r),
+		Height:         ac.Height,
+		TicketPrice:    ac.TicketPrice,
 		RewardPeriod:   ac.RewardPeriod,
 		TicketReward:   ac.TicketReward,
 		DCRPrice:       price,
@@ -215,7 +223,7 @@ func (exp *calculator) StatusPage(w http.ResponseWriter, r *http.Request, code, 
 	})
 	if err != nil {
 		log.Errorf("Template execute failure: %v", err)
-		str = "Something went very wrong if you can see this, try refreshing"
+		str = "Something went very wrong if you can see this, try refreshing" + err.Error()
 	}
 
 	w.Header().Set("Content-Type", "text/html")

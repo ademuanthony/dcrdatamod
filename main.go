@@ -14,6 +14,7 @@ import (
 	"github.com/decred/dcrd/rpcclient/v5"
 	"github.com/decred/dcrdata/exchanges/v2"
 	"github.com/decred/dcrdata/pkgs/attackcost"
+	"github.com/decred/dcrdata/pkgs/stakingreward"
 	"github.com/decred/dcrdata/rpcutils/v3"
 	"github.com/decred/dcrdata/semver"
 	notify "github.com/decred/dcrdata/v5/notification"
@@ -162,6 +163,16 @@ func _main(ctx context.Context) error {
 		}
 
 		notifier.RegisterBlockHandlerGroup(attCost.ConnectBlock)
+	}
+
+	if !cfg.DisableStakingRewardCalculator {
+		rewardCalculator, err := stakingreward.New(dcrdClient, webServer, xcBot, activeChain)
+		if err != nil {
+			log.Error(err)
+			return fmt.Errorf("Failed to create new staking reward component, %s", err.Error())
+		}
+
+		notifier.RegisterBlockHandlerGroup(rewardCalculator.ConnectBlock)
 	}
 
 	// (*notify.Notifier).processBlock will discard incoming block if PrevHash does not match
