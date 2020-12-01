@@ -155,7 +155,7 @@ func _main(ctx context.Context) error {
 
 	webServer.MountAssetPaths("/", "./public")
 
-	if !cfg.DisableAttackCost {
+	if cfg.EnableAttackCost {
 		attCost, err := attackcost.New(dcrdClient, webServer, xcBot, activeChain)
 		if err != nil {
 			log.Error(err)
@@ -165,7 +165,7 @@ func _main(ctx context.Context) error {
 		notifier.RegisterBlockHandlerGroup(attCost.ConnectBlock)
 	}
 
-	if !cfg.DisableStakingRewardCalculator {
+	if cfg.EnableStakingRewardCalculator {
 		rewardCalculator, err := stakingreward.New(dcrdClient, webServer, xcBot, activeChain)
 		if err != nil {
 			log.Error(err)
