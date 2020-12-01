@@ -87,19 +87,15 @@
 					<a class="menu-item" data-keynav-skip href="/" title="Home">Home</a>
 
 					<!--TODO:Dynamically render menu items as provided by each module-->
-					<a class="menu-item" data-keynav-skip href="/blocks" title="Decred blocks">Blocks</a>
-					<a class="menu-item" data-keynav-skip href="/mempool" title="Decred mempool">Mempool</a>
-					<a class="menu-item" data-keynav-skip href="/ticketpool" title="Decred ticket pool">Ticket Pool</a>
-					<a class="menu-item" data-keynav-skip href="/staking-reward" title="Staking Reward Calculator">Staking Reward</a>
-					<a class="menu-item jsonly" data-keynav-skip href="/charts" title="Decred charts">Charts</a>
-					<a class="menu-item" data-keynav-skip href="/agendas" title="Agendas">Agendas</a>
-					<a class="menu-item" data-keynav-skip href="/proposals" title="Proposals">Proposals</a>
-					<a class="menu-item" data-keynav-skip href="/market" title="Market">Market</a>
-					<a class="menu-item" data-keynav-skip href="/attack-cost" title="Decred Attack Cost">Attack Cost</a>
-					<a class="menu-item" data-keynav-skip href="/parameters" title="Chain Parameters">Parameters</a>
-					<a class="menu-item" data-keynav-skip href="/treasury" title="Decred Treasury">Treasury</a>
-					<a class="menu-item" data-keynav-skip href="/decodetx" title="Decode or send a raw transaction">Decode/Broadcast Tx</a>
-
+					
+					{{ range $menuItem := .MenuItems }}
+					<a data-keynav-skip href="{{$menuItem.Href}}" 
+					{{ range $key, $value := $menuItem.Attributes }}
+						{{$key}}="{{$value}}"
+					{{end}}>{{$menuItem.HyperText}}</a>
+					
+					{{ end }}
+					
 				{{- if eq .NetName "Mainnet"}}
 					<a class="menu-item" data-keynav-skip href="{{.Links.Testnet}}" title="Home">Switch To Testnet</a>
 				{{- else}}

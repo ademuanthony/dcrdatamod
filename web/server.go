@@ -81,6 +81,7 @@ type Server struct {
 	webMux      *chi.Mux
 	cfg         Config
 	Templates   *Templates
+	MenuItems   []MenuItem
 	routes      map[string]route
 	routeGroups []routeGroup
 }
@@ -103,6 +104,12 @@ type Links struct {
 	OnionURL      string
 }
 
+type MenuItem struct {
+	Href       string
+	HyperText  string
+	Attributes map[string]string
+}
+
 // Cookies contains information from the request cookies.
 type Cookies struct {
 	DarkMode bool
@@ -118,6 +125,7 @@ type CommonPageData struct {
 	BlockTimeUnix int64
 	DevAddress    string
 	Links         *Links
+	MenuItems     []MenuItem
 	NetName       string
 	Cookies       Cookies
 	RequestURI    string
@@ -152,7 +160,14 @@ type PageNumbers []PageNumber
 func NewServer(cfg Config, mux *chi.Mux, chainParams *chaincfg.Params) (*Server, error) {
 	commonTemplates := []string{"extras"}
 	templates := newTemplates(cfg.Viewsfolder, cfg.ReloadHTML, commonTemplates, makeTemplateFuncMap(chainParams))
-	s := &Server{mux, cfg, &templates, map[string]route{}, []routeGroup{}}
+	s := &Server{
+		webMux:      mux,
+		cfg:         cfg,
+		Templates:   &templates,
+		MenuItems:   []MenuItem{},
+		routes:      map[string]route{},
+		routeGroups: []routeGroup{},
+	}
 
 	return s, nil
 }
@@ -175,6 +190,10 @@ func (s *Server) MountAssetPaths(pathPrefix string, publicFolder string) {
 	FileServer(s.webMux, pathPrefix+"fonts", publicFolder+"fonts", s.cfg.CacheControlMaxAge)
 	FileServer(s.webMux, pathPrefix+"images", publicFolder+"images", s.cfg.CacheControlMaxAge)
 	FileServer(s.webMux, pathPrefix+"dist", publicFolder+"dist", s.cfg.CacheControlMaxAge)
+}
+
+func (s *Server) AddMenuItem(menuItem MenuItem) {
+	s.MenuItems = append(s.MenuItems, menuItem)
 }
 
 // FileServer conveniently sets up a http.FileServer handler to serve static

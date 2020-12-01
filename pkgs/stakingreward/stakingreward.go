@@ -18,6 +18,7 @@ import (
 
 type calculator struct {
 	templates *web.Templates
+	webServer *web.Server
 	xcBot     *exchanges.ExchangeBot
 
 	pageData *web.PageData
@@ -40,6 +41,7 @@ func New(dcrdClient *rpcclient.Client, webServer *web.Server,
 	xcBot *exchanges.ExchangeBot, params *chaincfg.Params) (*calculator, error) {
 	exp := &calculator{
 		templates:    webServer.Templates,
+		webServer:    webServer,
 		xcBot:        xcBot,
 		ChainParams:  params,
 		dcrdChainSvr: dcrdClient,
@@ -68,6 +70,15 @@ func New(dcrdClient *rpcclient.Client, webServer *web.Server,
 			return nil, err
 		}
 	}
+
+	exp.webServer.AddMenuItem(web.MenuItem{
+		Href: "/staking-reward",
+		HyperText: "Staking Reward",
+		Attributes: map[string]string{
+			"class": "menu-item",
+			"title": "Staking Reward Calculator",
+		},
+	})
 
 	// Development subsidy address of the current network
 	devSubsidyAddress, err := dbtypes.DevSubsidyAddress(params)
@@ -153,6 +164,7 @@ func (exp *calculator) commonData(r *http.Request) *web.CommonPageData {
 			DarkMode: darkMode != nil && darkMode.Value == "1",
 		},
 		RequestURI: r.URL.RequestURI(),
+		MenuItems:  exp.webServer.MenuItems,
 	}
 }
 
